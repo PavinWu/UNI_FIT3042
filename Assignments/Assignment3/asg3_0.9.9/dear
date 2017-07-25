@@ -1,0 +1,85 @@
+#!/bin/bash
+
+# dear: dedupping arhiever
+# ------------------------
+# see README.txt for more information
+# Written by Pavin Wu (26916592)
+# Written on 20 May 17
+
+## check flag and number of arguments
+valid=0
+if [ "$(echo $1 | head -c 1)" == "-" ]; then 	# if has a leading dash
+	if [ $1 == "-g" ] || [ $1 == "-b" ] || [ $1 == "-c" ]; then 	
+		if [ $# -ge 3 ]; then
+			valid=1
+		fi
+	else	# if wrong flag
+		echo "ERROR: Invalid flag"
+		echo "Use -g for .gzip, -b for .bzip2, -c for .Z"
+		echo "	or leave blank for no compression"
+		exit 2
+	fi	
+else	# no flag set. NOTE: -e* and -n* also come here ?????????
+	if [ $# -ge 2 ]; then
+		valid=2
+	fi
+fi
+
+if [ $valid -eq 0 ]; then
+	echo "ERROR: Not enough input arguments"
+	exit 1
+fi
+
+
+# assign directory
+if [ $valid -eq 1 ]; then	# with flag
+	DIR=$3
+	outDIR=$2
+elif [ $valid -eq 2 ]; then		# without flag
+	DIR=$2
+	outDIR=$1
+fi
+
+
+# test if $DIR (dir to be arhived) is a directory
+if [ ! -d "$DIR" ]; then	
+	echo "ERROR: $DIR is not a directory"
+	exit 3
+fi
+
+
+### Copy folder to /tmp and remove dup there (w/ text file indicating locations)
+workdir_name="/tmp/workdir_$$/"		# special work directory (with ID)
+mkdir "$workdir_name"				# make new folder with script ID to make unique
+cp -r "$DIR" "$workdir_name"		# copy DIR to find dup to special work dir
+
+cp "$(dirname $0)"/delete_dup.pl "$workdir_name"	# copy perl script to special work dir
+# This is so perl script is in same lvl as dir to achieve, and relative path from 
+#	dup_files_list.txt (below) can be processed directly.
+# $0 gives script's directory relative to current working directory: perl script
+#	must be in same directory as bash script!
+
+cwd="$(pwd)"					# keep current working directory
+indir_name="$(basename $DIR)" 		# get basename of DIR 
+pushd "$workdir_name"			# change path to special working directory
+fdupes -r "$indir_name" > dup_files_list.txt # find dup and output to text file
+
+./delete_dup.pl dup_files_list.txt		# perl script to delete dup files
+rm delete_dup.pl						# remove perl script from work dir
+
+tar -cf "${cwd}/${outDIR}".tar .	# Create tar in cwd with name outDIR (where tar is of folder in special work dir)
+popd							# come back to current working dir
+
+
+### compress
+if [ $1 == "-g" ]; then
+	gzip "$outDIR".tar
+elif [ $1 == "-b" ]; then
+	bzip2 "$outDIR".tar
+elif [ $1 == "-c" ]; then
+	compress "$outDIR".tar
+fi
+
+
+#remove special work dir
+rm -r "$workdir_name"		

@@ -1,0 +1,25 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<shiporder orderid="889923"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="shiporder.xsd">
+  John Smith
+  
+    Ola Nordmann
+    Langgt 23
+    4000 Stavanger
+    Norway
+  
+  
+    Empire Burlesque
+    Special Edition
+    1
+    10.90
+  
+  
+    Hide your heart
+    1
+    9.90
+  
+ 

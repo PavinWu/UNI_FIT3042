@@ -1,0 +1,36 @@
+#!/bin/bash
+
+echo "Welcome to retro computing shell"
+echo "Please enter a command"
+
+function msg {
+	echo -e "h: print this help message\\n"
+	echo -e "e filename: edit filename with vi\\n"
+	echo -e "t filename: touch this filename\\n"
+	echo -e "q: quit to bash shell\\n"
+	echo -e "l: list c source files\\n"
+	echo -e "f: find files whose names contain pattern\\n"
+}
+
+option_cut=h
+while [ $option_cut != q ]; do
+	echo "Command: "
+	read option
+	option_cut=$( echo $option | head -c 1 )
+	if [ $option_cut == h ]; then
+		echo $( msg )
+	elif [ $option_cut == e ]; then
+		vi "$( echo $option | tail -c +2 )"
+	elif [ $option_cut == t ]; then
+		touch "$( echo $option | tail -c +2 )"
+		echo "	file touched"
+	elif [ $option_cut == l ]; then
+		find ~ -name "*.[ch]"
+	elif [ $option_cut == f ]; then
+		name="$( echo $option | tail -c +3 )"
+		echo "$( find ~ -name "$name" )"
+	else
+		echo "	quitting CLI"
+	fi
+done
+

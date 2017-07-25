@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# COMMENTS: $1 is flag, $2 is arhieved file
+# WARNING: make a backup of your compressed file! Will be replaced with tar
+# 	file when doing decompression
+# won't work if tar name has /
+# ERROR when file already exist can fill the whole screen
+
+## check flag and number of arguments
+if [ "$(echo $1 | head -c 1)" == "-" ]; then 	# if has a leading dash
+	if [ $1 == "-d" ] || [ $1 == "-l" ] || [ $1 == "-c" ]; then 	
+		if [ $# -ge 2 ]; then
+			valid=1
+		else
+			echo "ERROR: Not enough input argument"
+			exit 1
+		fi
+	else
+		echo "ERROR: Invalid flag"
+		exit 2
+	fi	
+fi
+
+# Check that file exists
+if [ -e "$2" ]; then
+	# if tar not exists in current directory
+	# this could lead to error if have same tar name in current dir
+	if [ ! -e ./"$(basename \"$2\")" ]; then
+		# copy compressed tar to current working directory
+		cp "$2" .
+	fi
+else
+	echo "ERROR: $2 not exist!"
+	exit 5
+fi
+
+# Decompress based on file type & get tarname
+ztarname=$(basename $2)		# name of compressed tar (without path)
+extlen=5	# length of extension string (including .)
+
+# 	because of conditions: can replace dot with sth else
+if [ "$(echo "$ztarname" | tail -c 4)" == "bz2" ]; then
+	bzip2 -d "$ztarname"
+elif [ "$(echo "$ztarname" | tail -c 3)" == "gz" ]; then
+	gzip -d "$ztarname"
+	extlen=$(($extlen-1))
+elif [ "$(echo "$ztarname" | tail -c 2)" == "Z" ]; then
+	uncompress.real "$ztarname"
+	extlen=$(($extlen-2))
+else
+	if [ "$(echo "$ztarname" | tail -c 4)" == "tar" ]; then
+		extlen=0
+	else
+		echo "ERROR: Invalid file type"
+		exit 4
+	fi
+fi
+tarname="$(echo $ztarname | head -c -$extlen)"	# also take away right dot in ".tar."
+
+
+### Extract tar according to options
+workdir="/tmp/workdir_$$"
+mkdir "$workdir"
+tar -xf "$tarname"	--exclude="./dup_files_list.txt" -C "$workdir"	# extract copied tar (in cwd)
+cp -r "$workdir"/* .		# copy extracted folder to current directory
+tar -xf "$tarname" -C "$workdir" "./dup_files_list.txt"	# extract text file in workdir (to prevent duplicate)
+rm "$tarname"			# remove copied tar
+	
+if [ $1 == "-l" ] || [ $1 == "-c" ]; then
+	cp "$(dirname $0)"/restore_dup.pl .	# copy perl script to same folder as tar
+	# original perl script in same location as bash script
+	
+	# perl script to go through dup_files_list.txt and make symlink
+	# perl script to go through dup_files_list.txt and copy to orig folder
+	# use same perl script but pass $1 (if -l or -c), dup_files_list.txt
+	#	can find cwd directly from perl script
+	./restore_dup.pl $1 "${workdir}/dup_files_list.txt"
+	
+	rm restore_dup.pl	# remove perl script
+fi
+
+rm -r "$workdir"
+

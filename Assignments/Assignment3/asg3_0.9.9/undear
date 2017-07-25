@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# undear: undedupping unarhiever
+# ------------------------
+# see README.txt for more information
+# Written by Pavin Wu (26916592)
+# Written on 20 May 17
+
+# won't work if tar name has /
+
+
+## check flag and number of arguments
+if [ "$(echo $1 | head -c 1)" == "-" ]; then 	# if has a leading dash
+	if [ $1 == "-d" ] || [ $1 == "-l" ] || [ $1 == "-c" ]; then 	
+		if [ $# -ge 2 ]; then
+			valid=1
+		else
+			echo "ERROR: Not enough input argument. 2 is required"
+			exit 1
+		fi
+	else	# if wrong flag
+		echo "ERROR: Invalid flag. Use -d for delete, -l for link and -c for copy"
+		exit 2
+	fi
+else	# if no flag (-e[en]* and -n[en]* would come here)
+	echo "ERROR: No flag detected"
+	exit 2
+fi
+
+# if file not exists in the given path
+if [ ! -f "$2" ]; then	
+	echo "ERROR: $2 not exist!"
+	exit 5
+fi
+
+
+# Decompress based on file type & get tarname
+workdir="/tmp/workdir_$$" 	# special working directory
+mkdir "$workdir"
+cp "$2" "$workdir"			# copy compressed tar to special workdir
+ztarname="${workdir}/$(basename $2)"	# name of compressed tar (in special workdir)
+extlen=5					# length of extension string (including .)
+
+if [ "$(echo "$ztarname" | tail -c 4)" == "bz2" ]; then
+	bzip2 -d "$ztarname"
+elif [ "$(echo "$ztarname" | tail -c 3)" == "gz" ]; then
+	gzip -d "$ztarname"
+	extlen=$(($extlen-1))
+elif [ "$(echo "$ztarname" | tail -c 2)" == "Z" ]; then
+	uncompress.real "$ztarname"
+	extlen=$(($extlen-2))
+else
+	if [ "$(echo "$ztarname" | tail -c 4)" == "tar" ]; then
+		extlen=0
+	else
+		echo "ERROR: Invalid file type"
+		exit 4
+	fi
+fi
+# funfact: because of above conditions: can replace extension dot with sth else
+tarname="$(echo $ztarname | head -c -$extlen)"	# take away compression extension string and its dot
+
+
+### Extract tar according to options
+tar -xf "$tarname" --exclude="./dup_files_list.txt" -C "$workdir"	# extract tar in workdir
+
+mkdir "${workdir}temp"				# make temp folder
+mv "$tarname" "${workdir}temp"			# move tar temporarily to temp folder
+cp -r "$workdir"/* . 				# copy extracted folder to current directory
+mv "${workdir}temp/"* "$workdir"		# move tar back
+rm -r "${workdir}temp"				# remove temp folder
+
+tar -xf "$tarname" -C "$workdir" "./dup_files_list.txt"	# extract dup_files_list in workdir
+	
+if [ $1 == "-l" ] || [ $1 == "-c" ]; then
+	if [ ! -f restore_dup.pl ]; then		# if restore_dup.pl not in .
+		cp "$(dirname $0)"/restore_dup.pl .		# copy perl script to cwd
+		# to allow referring to files with relative paths in dup_files_list.txt in the script
+	fi
+	
+	./restore_dup.pl $1 "${workdir}/dup_files_list.txt" # perl script to restore dup files
+	rm restore_dup.pl	# remove perl script
+fi
+
+# remove special work dir
+rm -r "$workdir"
+

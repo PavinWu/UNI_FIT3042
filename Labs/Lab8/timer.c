@@ -1,0 +1,80 @@
+#include <SDL.h>
+#include <stdio.h>
+
+
+void PrintKeyInfo( SDL_KeyboardEvent *key ){
+	// giving main() something to do other than the timer
+	// showing that we can have two simultaneous independent threads
+	printf( "Scancode: 0x%02X", key->keysym.scancode );
+	printf( ", Name: %s\n", SDL_GetKeyName( key->keysym.sym ) );
+	return;
+}
+
+void timer_action(void *ignored) {
+	// print a message to demonstrate that the timer has gone off
+	printf("Time passed\n");
+}
+
+Uint32 timercallback(Uint32 interval, void *parameter) {
+	// create an event to let main() know it needs to do something
+	SDL_Event event;
+	SDL_UserEvent user;
+	user.type=SDL_USEREVENT;
+	user.code=0;
+	
+	// function we want main event loop to call, and its data
+	user.data1=&timer_action;
+	user.data2=NULL;
+	event.type=SDL_USEREVENT;
+
+	// the UserEvent struct sits inside the Event
+	event.user=user;
+	SDL_PushEvent(&event);
+
+	// we could change the interval between timer ticks if we wanted to
+	return interval;
+}
+int main()
+{
+	SDL_Event event;
+	SDL_Window *window = NULL;
+	void (*fptr)(void *);
+
+	SDL_Init(SDL_INIT_EVERYTHING);
+	
+	// keypresses won't register unless they go to this window
+	window = SDL_CreateWindow("Timer", 
+			SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+			640, 480, SDL_WINDOW_SHOWN);
+	SDL_Surface *s = SDL_GetWindowSurface(window);
+	SDL_FillRect(s, NULL, SDL_MapRGB(s->format, 0xFF, 0xFF, 0xFF));
+	SDL_UpdateWindowSurface(window);
+
+	// tell the timer to go off once a second (and call timercallback)
+	SDL_AddTimer(1000, timercallback, NULL);
+	while( SDL_WaitEvent( &event ) ){
+		switch( event.type ){
+
+			// when not responding to timer messages, main() responds to keypresses
+			case SDL_KEYDOWN:
+				printf("Key was pushed down.\n");
+				PrintKeyInfo( &event.key );
+				break;
+			case SDL_KEYUP:
+				printf("Key came up\n");
+				break;
+
+			// this is where we respond to the timer
+			case SDL_USEREVENT:
+				// function the timer wants us to call, and its data
+				fptr = event.user.data1;
+				void *arg = event.user.data2;
+				fptr(arg);
+
+			// ignore all other events
+			default:
+				break;
+		}
+	}
+	return 0;
+}

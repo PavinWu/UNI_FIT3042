@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# COMMENTS: $1 is flag, $2 is arhieved file
+# WARNING: make a backup of your compressed file! Will be replaced with tar
+# 	file when doing decompression
+# won't work if tar name has /
+
+## check flag and number of arguments
+if [ "$(echo $1 | head -c 1)" == "-" ]; then 	# if has a leading dash
+	if [ $1 == "-d" ] || [ $1 == "-l" ] || [ $1 == "-c" ]; then 	
+		if [ $# -ge 2 ]; then
+			valid=1
+		else
+			echo "Not enough input argument"
+			exit 1
+		fi
+	else
+		echo "Invalid flag"
+		exit 2
+	fi	
+fi
+
+
+# Decompress based on file type
+# because of conditions: can replace dot with sth else
+if [ "$(echo $2 | tail -c 4)" == "bz2" ]; then
+	bzip2 -d $2
+	tarname="$(echo $2 | head -c -5)"	# also take away right dot in ".tar."
+elif [ "$(echo $2 | tail -c 3)" == "gz" ]; then
+	gzip -d $2
+	tarname="$(echo $2 | head -c -4)"
+elif [ "$(echo $2 | tail -c 2)" == "Z" ]; then
+	uncompress.real $2
+	tarname="$(echo $2 | head -c -3)"
+else
+	if [ "$(echo $2 | tail -c 4)" != "tar" ]; then
+		echo "Invalid file type"
+		exit 4
+	fi
+	tarname="$2"
+fi
+
+### Extract tar according to options
+if [ $1 == "-d" ]; then
+	tar -xvf $2
+elif [ $1 == "-l" ] || [ $1 == "-c" ]; then
+	filedir_name="filedir_$$"	# dir to contain extracted files
+	mkdir "$filedir_name"			# make it
+	cp "$tarname" "./$filedir_name/$(basename $tarname)"
+	# copy tar to special file dir to 1.keep dup txt and folder in one place and 
+	# 2.original tar could be from anywhere. Put it in filedir_name.
+
+	cp "$(dirname $0)"/return_dup.pl "$filedir_name"	# copy perl script to workdir
+	# perl script in same location as bash script
+	
+	cwd="$(pwd)"				# get current directory
+	pushd "$filedir_name"			# change to special working directory
+	tar -xvf "$(basename $tarname)"		# extract tar
+	rm "$(basename $tarname)"			# remove extracted tar
+
+	# perl script to go through dup_files_list.txt and make symlink
+	# perl script to go through dup_files_list.txt and copy to orig folder
+	# use same perl script but pass $1 (if -l or -c), dup_files_list.txt
+	#	can find cwd directly from perl script
+	
+	rm return_dup.pl	# remove perl script
+	rm "dup_files_list.txt"
+		
+	if [ $1 == "-c" ]; then
+		rm "dup_files_list.txt"
+		rm "dup_files_dir"
+		cp -r ./* "$cwd"	# copy anything *inside* filedir to cwd 
+							# (i.e. original uncompressed folder)
+	fi
+	
+	popd
+fi

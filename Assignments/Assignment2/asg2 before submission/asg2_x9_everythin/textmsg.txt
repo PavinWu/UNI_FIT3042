@@ -1,0 +1,2 @@
+./testimg/testmsg ./testimg/ufo.ppm ./testimg/ufo2.ppm
+./testimg/testmsg2 ./testimg/feep-000.ppm ./testimg/feep2.ppm

@@ -1,0 +1,39 @@
+#!/bin/bash
+
+## COMMENTS
+## LIMITATION: -e and -n flag still got through even if invalid
+## REQUIRE fdupes to be installed
+
+valid=0
+## check flag
+# if has a leading dash
+if [ "$(echo $1 | head -c 1)" == "-" ]; then 
+	# if -d or -l or -c
+	if [ $1 == "-d" ] || [ $1 == "-l" ] || [ $1 == "-c" ]; then
+		valid=1		# setting new (bash is more loose?)
+	else
+		echo "Invalid flag"
+	fi	
+else
+	# -e* and -n* come here ?????????
+	valid=2
+fi
+
+## assign directory
+if [ $valid -eq 1 ]; then
+	DIR=$3
+elif [ $valid -eq 2 ]; then
+	DIR=$2
+fi
+
+## copy folder to /tmp to work with
+if [ $valid -eq 1 ] || [ $valid -eq 2 ]; then
+	dir_name="$(basename $DIR)" # get base folder name
+	cp -r "$DIR" /tmp	# copy to /tmp
+	mv /tmp/"$dir_name" /tmp/"$dir_name"$$	# append script ID to make unique
+	
+	dir_name="/tmp/${dir_name}$$"	# new dir_name (with ID)
+	cd "$dir_name"	# do this to get . as first parent dir
+	dup_files="$(fdupes -r .)"	# find dup
+	# output to textfile
+fi

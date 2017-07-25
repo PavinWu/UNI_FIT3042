@@ -1,0 +1,91 @@
+#!/bin/bash
+
+## COMMENTS
+
+## LIMITATIONs: 
+# . -e and -n flag still got through even if invalid	***** (DONT KNOW WHYY???)
+#		will get error outfile not a directory anyway (but not representative of error)
+# . REQUIRE fdupes to be installed
+# . also set files with different names (but same content) as duplicates
+# . folder to compress must not be named dup_files_dir (can combine or not?)
+# . fdupes not handle duplicate files with different file names
+# . REQUIRE perl scripts in same folder as associating bash script
+
+
+## check flag and number of arguments
+if [ "$(echo $1 | head -c 1)" == "-" ]; then 	# if has a leading dash
+	if [ $1 == "-g" ] || [ $1 == "-b" ] || [ $1 == "-c" ]; then 	
+		if [ $# -ge 3 ]; then
+			valid=1
+		else
+			valid=0
+		fi
+	else
+		echo "ERROR: Invalid flag"
+		exit 2
+	fi	
+else	# (no flag set). NOTE: -e* and -n* also come here ?????????
+	if [ $# -ge 2 ]; then
+		valid=2
+	else
+		valid=0
+	fi
+fi
+
+if [ $valid -eq 0 ]; then
+	echo "ERROR: Not enough input argument"
+	exit 1
+fi
+
+
+# assign directory
+if [ $valid -eq 1 ]; then
+	DIR=$3
+	outDIR=$2
+elif [ $valid -eq 2 ]; then
+	DIR=$2
+	outDIR=$1
+fi
+
+
+# test if $DIR is a directory
+if [ ! -d "$DIR" ]; then	
+	echo "ERROR: $DIR is not a directory"
+	exit 3
+fi
+
+
+### Copy folder to /tmp and remove dup there (w/ text file indicating locations)
+indir_name="$(basename $DIR)" 		# get base folder name
+workdir_name="/tmp/workdir_$$/"		# work directory (with ID)
+mkdir "$workdir_name"	# make new folder with script ID to make unique
+cp -r "$DIR" "$workdir_name"		# copy to work dir
+
+cp "$(dirname $0)"/delete_dup.pl "$workdir_name"		
+# copy perl script to work dir (so we can get work dir directly with cwd in perl)
+#	rather than having to retrive separate parent dir when deal with files.
+# $0 gives script's directory relative to cwd (current folder in bash)
+
+cwd="$(pwd)"	# keep current working directory
+pushd "$workdir_name"	# change path to special working directory
+fdupes -r "$indir_name" > dup_files_list.txt # find dup and output to text file
+
+./delete_dup.pl dup_files_list.txt	# perl script to deal with files
+rm delete_dup.pl			# remove perl script from work dir
+
+tar -cf "${cwd}/${outDIR}".tar .	# has dot at end!: Create tar (of folder in special work_dir) in current working dir
+popd					# come back to current working dir
+
+
+### compress
+if [ $1 == "-g" ]; then
+	gzip "$outDIR".tar
+elif [ $1 == "-b" ]; then
+	bzip2 "$outDIR".tar
+elif [ $1 == "-c" ]; then
+	compress "$outDIR".tar
+fi
+
+
+#remove comp_folder
+rm -r "$workdir_name"		
